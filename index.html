@@ -72,8 +72,8 @@
   }
 
   #game{ background: url('imagenes/mapa_mundial_verde.png') center/cover no-repeat; }
-
-  .level{
+  
+.level{
     position:absolute;
     width:80px;
     height:80px;
@@ -83,7 +83,8 @@
     background-size:cover;
     background-position:center;
     transition:transform .2s;
-  }
+}
+
   .level:hover{ transform:scale(1.08); }
   .level.cleared{ box-shadow:0 0 15px #00ff73; filter:brightness(1.15); }
 
@@ -216,7 +217,7 @@
 
 <!-- ======= MENÚ ======= -->
 <div id="menu">
-  <h1>🌎 MUNDIAL VERDE 🌱</h1>
+  <h1>🌎 Guardianes del Planeta🌱</h1>
   <button class="btn" id="btnStart">▶ Iniciar</button>
   <button class="btn" id="btnConfig">⚙ Configuración</button>
   <button class="btn" id="btnExit">❌ Salir</button>
@@ -276,53 +277,64 @@
   <p>Los Guardianes del Planeta siempre te recordarán.</p>
   <button class="btn" id="btnRestart">🔁 Volver al Menú</button>
 </div>
+
 <script>
-/* ======= DATOS DE NIVELES (DIFICULTAD AUMENTADA) ======= */
+/* ===========================
+   DATOS DE NIVELES
+   =========================== */
 const levels = {
   1: {
     name: "Estadio Azteca (México)",
     boss: "Smogzilla",
-    hp: 150, // antes 100
+    hp: 80,
     item: "Planta Purificadora",
+    message: "🌱 El aire limpio es vida. Reducir emisiones ayuda al planeta a respirar.",
     enemyImg: "imagenes/enemigo1.png",
     bg: "imagenes/fondo_nivel1.png"
   },
   2: {
     name: "Estadio BBVA (México)",
     boss: "Basurón",
-    hp: 190, // antes 120
+    hp: 110,
     item: "Reciclador Solar",
+    message: "♻ Reciclar evita contaminar ríos, mares y bosques.",
     enemyImg: "imagenes/enemigo2.png",
     bg: "imagenes/fondo_nivel2.png"
   },
   3: {
     name: "Estadio Akron (México)",
     boss: "Aceitón",
-    hp: 230, // antes 140
+    hp: 150,
     item: "Filtro de Agua",
+    message: "💧 El agua es limitada, cuídala todos los días.",
     enemyImg: "imagenes/enemigo3.png",
     bg: "imagenes/fondo_nivel3.png"
   },
   4: {
     name: "BC Place (Canadá)",
     boss: "Hielox",
-    hp: 300, // antes 160
+    hp: 180,
     item: "Cristal Verde",
+    message: "❄ El hielo se derrite por el calentamiento global. Actúa hoy.",
     enemyImg: "imagenes/enemigo4.png",
     bg: "imagenes/fondo_nivel4.png"
   },
   5: {
-    name: "Final Mundial – Estadio Fusión",
+    name: "Estadio Fusión – Final",
     boss: "Ecofusión",
-    hp: 450, // antes 200 – MUY DIFÍCIL
+    hp: 240,
     item: "Corazón del Planeta",
+    message: "🌍 El futuro depende de millones de pequeños actos buenos.",
     enemyImg: "imagenes/enemigo5.png",
     bg: "imagenes/fondo_nivel5.png"
   }
 };
 
-let playerHP = 100, enemyHP = 0, currentLevel = 1, enemyName = "";
+/* ======= VARIABLES ======= */
+let playerHP = 100, enemyHP = 0, currentLevel = 1;
+let enemyName = "";
 let clearedLevels = [];
+let canAct = true;
 
 /* ======= ELEMENTOS ======= */
 const bgMusic = document.getElementById("bgMusic");
@@ -337,167 +349,225 @@ const battleEl = document.getElementById("battle");
 const cinematicEl = document.getElementById("cinematic");
 const endingEl = document.getElementById("ending");
 
-/* ======= MENÚ ======= */
+/* ===========================
+   MODO PANTALLA COMPLETA
+   =========================== */
+function activarPantallaCompleta(){
+  const elem = document.documentElement;
+  if (elem.requestFullscreen) elem.requestFullscreen();
+  if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
+  if (elem.msRequestFullscreen) elem.msRequestFullscreen();
+}
+
+/* ===========================
+   BOTÓN INICIAR
+   =========================== */
 document.getElementById("btnStart").addEventListener("click", () => {
+  activarPantallaCompleta();
+
   menuEl.style.display = "none";
   gameEl.style.display = "block";
-  if (document.getElementById("musicToggle").checked) {
-    bgMusic.play().catch(()=>console.log("Música bloqueada"));
-  }
-});
-document.getElementById("btnConfig").addEventListener("click", ()=> {
-  document.getElementById("config").style.display = "block";
-});
-document.getElementById("closeConfig").addEventListener("click", ()=> {
-  document.getElementById("config").style.display = "none";
-});
-document.getElementById("btnExit").addEventListener("click", ()=> {
-  alert("👋 Gracias por jugar Mundial Verde. ¡Hasta pronto!");
+
+  if (document.getElementById("musicToggle").checked)
+    bgMusic.play().catch(()=>{});
 });
 
-/* ======= NIVELES CLICK ======= */
+/* ===========================
+   BOTÓN SALIR (cerrar pestaña)
+   =========================== */
+document.getElementById("btnExit").addEventListener("click", ()=>{
+  alert("👋 Gracias por jugar Mundial Verde.");
+  window.close(); // solo funciona si la pestaña fue abierta por JS
+});
+
+/* ===========================
+   CONFIGURACIÓN
+   =========================== */
+document.getElementById("btnConfig").addEventListener("click", ()=>{
+  document.getElementById("config").style.display = "block";
+});
+document.getElementById("closeConfig").addEventListener("click", ()=>{
+  document.getElementById("config").style.display = "none";
+});
+
+/* ===========================
+   SISTEMA DE PROGRESO:
+   NO PUEDES ENTRAR A NIVELES BLOQUEADOS
+   =========================== */
+
 document.querySelectorAll(".level").forEach(btn=>{
   btn.addEventListener("click", ()=>{
-    const levelNum = parseInt(btn.dataset.level);
-    if (clearedLevels.includes(levelNum)) {
-      document.getElementById("dialogue").textContent = `🌿 Navi: Ya limpiaste el ${levels[levelNum].name}. ¡Gran trabajo! ♻`;
-    } else startLevel(levelNum);
+    const lvl = parseInt(btn.dataset.level);
+
+    if (lvl > 1 && !clearedLevels.includes(lvl - 1)){
+      document.getElementById("dialogue").textContent =
+        ⛔ Para entrar aquí debes limpiar primero el nivel ${lvl - 1}.;
+      return;
+    }
+
+    if (clearedLevels.includes(lvl)){
+      document.getElementById("dialogue").textContent =
+        ✔ Ya limpiaste ${levels[lvl].name}.;
+      return;
+    }
+
+    startLevel(lvl);
   });
 });
 
-function startLevel(levelNum){
-  currentLevel = levelNum;
-  const level = levels[levelNum];
-  enemyName = level.boss;
-  enemyHP = level.hp;
+/* ===========================
+   INICIAR NIVEL
+   =========================== */
+function startLevel(lvl){
+  currentLevel = lvl;
+  canAct = true;
+
+  const L = levels[lvl];
+  enemyName = L.boss;
+  enemyHP = L.hp;
   playerHP = 100;
 
-  // enemy sprite, hud, texts
-  document.getElementById("enemy").style.backgroundImage = `url('${level.enemyImg}')`;
+  document.getElementById("enemy").style.backgroundImage = url('${L.enemyImg}');
+  document.getElementById("battleStage").style.background = url('${L.bg}') center/cover no-repeat;
+  document.getElementById("levelTitle").textContent = ⚔ ${L.name};
+  document.getElementById("battleText").textContent = ${enemyName} aparece contaminando el estadio...;
+
   document.getElementById("enemyHP").style.width = "100%";
   document.getElementById("playerHP").style.width = "100%";
-  document.getElementById("levelTitle").textContent = `⚔ ${level.name}`;
-  document.getElementById("battleText").textContent = `Aparece ${enemyName} contaminando el estadio...`;
 
-  // fondo
-  document.getElementById("battleStage").style.background = `url('${level.bg}') center/cover no-repeat`;
-
-  // mostrar pantallas
   gameEl.style.display = "none";
   battleEl.style.display = "block";
 }
 
-/* ======= SONIDOS ======= */
+/* ===========================
+   SONIDOS
+   =========================== */
 function playSound(sound){
   if (!document.getElementById("soundToggle").checked) return;
   sound.currentTime = 0;
   sound.play().catch(()=>{});
 }
 
-/* ======= COMBATE (DIFICULTAD AUMENTADA) ======= */
+/* ===========================
+   ATAQUES DE JUGADOR
+   =========================== */
 function attack(type){
+  if (!canAct) return;
+  canAct = false;
+
   const player = document.getElementById("player");
   let damage = 0;
 
-  if (type === "eco") damage = Math.floor(Math.random()*25)+12;
-  else if (type === "reciclar") damage = Math.floor(Math.random()*18)+6;
+  if (type === "eco") damage = Math.floor(Math.random()*20)+10;
+  else if (type === "reciclar") damage = Math.floor(Math.random()*12)+5;
   else if (type === "curar"){
-    const heal = Math.floor(Math.random()*10)+5; // curación reducida
+    const heal = Math.floor(Math.random()*15)+8;
     playerHP = Math.min(100, playerHP + heal);
     playSound(healSound);
-    document.getElementById("battleText").textContent = `🌱 Te curaste ${heal} puntos.`;
+    document.getElementById("battleText").textContent =
+      🌱 Te curaste ${heal} puntos.;
     updateBars();
-    setTimeout(enemyTurn, 900);
-    return;
+    return setTimeout(enemyTurn, 900);
   }
 
-  // animación y daño
+  // animación
   player.classList.add("attackAnim");
   playSound(hitSound);
   setTimeout(()=> player.classList.remove("attackAnim"), 300);
 
   enemyHP -= damage;
-  document.getElementById("battleText").textContent = `💥 Atacaste y causaste ${damage} de daño.`;
+  document.getElementById("battleText").textContent =
+    💥 Le hiciste ${damage} de daño.;
+
   updateBars();
 
-  if (enemyHP <= 0) winBattle();
-  else setTimeout(enemyTurn, 900);
+  if (enemyHP <= 0) return winBattle();
+
+  setTimeout(enemyTurn, 900);
 }
 
+/* ===========================
+   ATAQUE ENEMIGO
+   =========================== */
 function enemyTurn(){
   const enemy = document.getElementById("enemy");
 
-  // daño base aumentado
-  let baseDamage = Math.floor(Math.random()*15) + 12;
-
-  // dificultad según nivel
-  if (currentLevel == 3) baseDamage += 8;
-  if (currentLevel == 4) baseDamage += 15;
-  if (currentLevel == 5) baseDamage += 25; // jefe súper fuerte
-
-  const damage = baseDamage;
+  let dmg = Math.floor(Math.random()*10)+5;
+  if (currentLevel === 3) dmg += 4;
+  if (currentLevel === 4) dmg += 7;
+  if (currentLevel === 5) dmg += 12;
 
   enemy.classList.add("enemyAttack");
   playSound(hitSound);
   setTimeout(()=> enemy.classList.remove("enemyAttack"), 300);
 
-  playerHP -= damage;
-
+  playerHP -= dmg;
   document.getElementById("battleText").textContent =
-    `⚠ ${enemyName} te golpea causando ${damage} de daño.`;
+    ⚠ ${enemyName} te golpea por ${dmg}.;
 
   updateBars();
 
-  if (playerHP <= 0) loseBattle();
+  if (playerHP <= 0) return loseBattle();
+
+  canAct = true;
 }
 
-/* ======= ACTUALIZAR BARRAS ======= */
+/* ===========================
+   ACTUALIZAR BARRAS
+   =========================== */
 function updateBars(){
-  const enemyPct = Math.max(0, (enemyHP / levels[currentLevel].hp) * 100) + "%";
-  const playerPct = Math.max(0, (playerHP / 100) * 100) + "%";
-  document.getElementById("enemyHP").style.width = enemyPct;
-  document.getElementById("playerHP").style.width = playerPct;
+  document.getElementById("enemyHP").style.width =
+    Math.max(0, enemyHP / levels[currentLevel].hp * 100) + "%";
+
+  document.getElementById("playerHP").style.width =
+    Math.max(0, playerHP) + "%";
 }
 
-/* ======= VICTORIA / DERROTA ======= */
+/* ===========================
+   GANAR BATALLA
+   =========================== */
 function winBattle(){
+  const L = levels[currentLevel];
+
   playSound(winSound);
   document.getElementById("battleText").textContent =
-    `🎉 ¡Derrotaste a ${enemyName}! Obtuviste: ${levels[currentLevel].item}`;
+    🎉 ¡Has limpiado el estadio! ${L.message};
 
-  clearedLevels.push(parseInt(currentLevel));
-  const levelDot = document.querySelector(`.level[data-level='${currentLevel}']`);
-  if(levelDot) levelDot.classList.add("cleared");
+  clearedLevels.push(currentLevel);
+
+  const dot = document.querySelector(.level[data-level='${currentLevel}']);
+  if (dot) dot.classList.add("cleared");
 
   setTimeout(()=>{
     battleEl.style.display = "none";
-    if (currentLevel == 5) showCinematic();
-    else {
-      gameEl.style.display = "block";
-      document.getElementById("dialogue").textContent =
-        `🌿 Navi: ¡Excelente! Has limpiado ${levels[currentLevel].name}.`;
-    }
-  }, 2000);
+
+    if (currentLevel === 5) return showCinematic();
+
+    gameEl.style.display = "block";
+    document.getElementById("dialogue").textContent = 🌿 ${L.message};
+  },2000);
 }
 
+/* ===========================
+   PERDER BATALLA
+   =========================== */
 function loseBattle(){
   document.getElementById("battleText").textContent =
-    "💀 Has sido derrotado. Intenta otra vez.";
+    "💀 Fuiste derrotado. Inténtalo otra vez.";
+
   setTimeout(()=>{
-    battleEl.style.display = "none";
-    gameEl.style.display = "block";
-    document.getElementById("dialogue").textContent =
-      "😔 Navi: No te rindas, el planeta aún te necesita.";
-  }, 2000);
+    startLevel(currentLevel);
+  },1500);
 }
 
-/* ======= CINEMÁTICA ======= */
+/* ===========================
+   CINEMÁTICA FINAL
+   =========================== */
 function showCinematic(){
   gameEl.style.display = "none";
   battleEl.style.display = "none";
 
   bgMusic.pause();
-  finalMusic.currentTime = 0;
   finalMusic.play().catch(()=>{});
 
   cinematicEl.style.display = "flex";
@@ -505,33 +575,28 @@ function showCinematic(){
   setTimeout(()=>{
     cinematicEl.style.display = "none";
     endingEl.style.display = "block";
-    finalMusic.pause();
-  }, 15000);
+  },15000);
 }
 
-/* ======= REINICIO ======= */
+/* ===========================
+   REINICIO
+   =========================== */
 document.getElementById("btnRestart")?.addEventListener("click", ()=>{
   clearedLevels = [];
-  playerHP = 100;
-  enemyHP = 0;
   currentLevel = 1;
+  playerHP = 100;
+
   endingEl.style.display = "none";
   menuEl.style.display = "flex";
+
   bgMusic.currentTime = 0;
-  if(document.getElementById("musicToggle").checked)
-    bgMusic.play().catch(()=>{});
+  bgMusic.play().catch(()=>{});
 });
 
-/* ======= INICIO ======= */
+/* ===========================
+   INICIO
+   =========================== */
 document.addEventListener("DOMContentLoaded", ()=>{
   menuEl.style.display = "flex";
-  gameEl.style.display = "none";
-  battleEl.style.display = "none";
-  cinematicEl.style.display = "none";
-  endingEl.style.display = "none";
 });
 </script>
-
-</body>
-</html>
-
