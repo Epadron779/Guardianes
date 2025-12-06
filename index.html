@@ -208,6 +208,7 @@
 <body>
 
 <!-- ======= SONIDOS ======= -->
+<!-- Nota: externos pueden bloquear autoplay, se manejan con .catch() -->
 <audio id="bgMusic" loop src="https://vgmsite.com/soundtracks/pokemon-gameboy-sound-collection/jmqqblrl/101%20-%20Opening.mp3"></audio>
 <audio id="hitSound" src="https://www.myinstants.com/media/sounds/punch.mp3"></audio>
 <audio id="healSound" src="https://www.myinstants.com/media/sounds/potion.mp3"></audio>
@@ -255,9 +256,9 @@
     <div style="color:white;"><b>👾 Enemigo</b> HP: <div class="hpBar"><div id="enemyHP" class="hp"></div></div></div>
     <div id="battleText" style="margin-top:6px; color:white;">¡La batalla comienza!</div>
     <div id="buttons">
-      <button onclick="attack('eco')">💧 Ataque Verde</button>
-      <button onclick="attack('reciclar')">♻ Reciclar Energía</button>
-      <button onclick="attack('curar')">🌱 Curar</button>
+      <button id="btnEco">💧 Ataque Verde</button>
+      <button id="btnReciclar">♻ Reciclar Energía</button>
+      <button id="btnCurar">🌱 Curar</button>
     </div>
   </div>
 </div>
@@ -348,40 +349,51 @@ const battleEl = document.getElementById("battle");
 const cinematicEl = document.getElementById("cinematic");
 const endingEl = document.getElementById("ending");
 
+const btnEco = document.getElementById("btnEco");
+const btnReciclar = document.getElementById("btnReciclar");
+const btnCurar = document.getElementById("btnCurar");
+
 /* ===========================
-   MODO PANTALLA COMPLETA
+   AYUDAS: fullscreen & play wrappers
    =========================== */
 function activarPantallaCompleta(){
   const elem = document.documentElement;
-  if (elem.requestFullscreen) elem.requestFullscreen().catch(()=>{});
-  else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
-  else if (elem.msRequestFullscreen) elem.msRequestFullscreen();
+  try {
+    if (elem.requestFullscreen) return elem.requestFullscreen();
+    if (elem.webkitRequestFullscreen) return elem.webkitRequestFullscreen();
+    if (elem.msRequestFullscreen) return elem.msRequestFullscreen();
+  } catch(e){
+    console.warn("Fullscreen no permitido:", e);
+  }
+}
+function tryPlay(audio){
+  if(!audio) return;
+  audio.currentTime = 0;
+  audio.play().catch(err => {
+    // Falló autoplay; lo dejamos en silencio y el usuario puede activar sonidos desde config.
+    console.warn("play() bloqueado:", err);
+  });
 }
 
 /* ===========================
-   BOTÓN INICIAR
+   BOTONES DEL MENÚ
    =========================== */
 document.getElementById("btnStart").addEventListener("click", () => {
-  activarPantallaCompleta();
+  // Intentar fullscreen (puede fallar en GitHub Pages pero no romperá nada)
+  try { activarPantallaCompleta(); } catch(e){}
 
   menuEl.style.display = "none";
   gameEl.style.display = "block";
 
   const musicToggle = document.getElementById("musicToggle");
-  if (musicToggle && musicToggle.checked) bgMusic.play().catch(()=>{});
+  if (musicToggle && musicToggle.checked) tryPlay(bgMusic);
 });
 
-/* ===========================
-   BOTÓN SALIR (cerrar pestaña)
-   =========================== */
 document.getElementById("btnExit").addEventListener("click", ()=>{
   alert("👋 Gracias por jugar Mundial Verde.");
-  try { window.close(); } catch(e){}
+  try { window.close(); } catch(e){ /* no se puede cerrar pestañas desde algunos navegadores */ }
 });
 
-/* ===========================
-   CONFIGURACIÓN
-   =========================== */
 document.getElementById("btnConfig").addEventListener("click", ()=>{
   document.getElementById("config").style.display = "block";
 });
@@ -390,8 +402,7 @@ document.getElementById("closeConfig").addEventListener("click", ()=>{
 });
 
 /* ===========================
-   SISTEMA DE PROGRESO:
-   NO PUEDES ENTRAR A NIVELES BLOQUEADOS
+   SISTEMA DE PROGRESO (NIVELES)
    =========================== */
 document.querySelectorAll(".level").forEach(btn=>{
   btn.addEventListener("click", ()=>{
@@ -421,72 +432,82 @@ function startLevel(lvl){
   canAct = true;
 
   const L = levels[lvl];
+  if(!L){
+    console.error("Nivel desconocido:", lvl);
+    return;
+  }
+
   enemyName = L.boss;
-  enemyHP = L.hp;
+  enemyHP = L.hp; // hp absoluto
   playerHP = 100;
 
-  // Establecer imágenes y textos usando template literals correctamente
-  document.getElementById("enemy").style.backgroundImage = `url('${L.enemyImg}')`;
-  document.getElementById("battleStage").style.background = `url('${L.bg}') center/cover no-repeat`;
-  document.getElementById("levelTitle").textContent = `⚔ ${L.name}`;
+  // Establecer imágenes y textos
+  const enemyEl = document.getElementById("enemy");
+  const stageEl = document.getElementById("battleStage");
+
+  enemyEl.style.backgroundImage = `url('${L.enemyImg}')`;
+  stageEl.style.background = `url('${L.bg}') center/cover no-repeat`;
+  document.getElementById("levelTitle").textContent = `⚔ ${L.name} – Jefe: ${L.boss}`;
   document.getElementById("battleText").textContent = `${enemyName} aparece contaminando el estadio...`;
 
-  document.getElementById("enemyHP").style.width = "100%";
-  document.getElementById("playerHP").style.width = "100%";
+  updateBars();
 
   gameEl.style.display = "none";
   battleEl.style.display = "block";
 }
 
 /* ===========================
-   SONIDOS
+   SONIDOS (respetando toggle)
    =========================== */
 function playSound(sound){
   const soundToggle = document.getElementById("soundToggle");
   if (soundToggle && !soundToggle.checked) return;
-  try {
-    sound.currentTime = 0;
-    sound.play().catch(()=>{});
-  } catch(e){}
+  tryPlay(sound);
 }
 
 /* ===========================
    ATAQUES DE JUGADOR
    =========================== */
+btnEco.addEventListener("click", ()=> attack('eco'));
+btnReciclar.addEventListener("click", ()=> attack('reciclar'));
+btnCurar.addEventListener("click", ()=> attack('curar'));
+
 function attack(type){
   if (!canAct) return;
   canAct = false;
 
   const player = document.getElementById("player");
-  let damage = 0;
 
-  if (type === "eco") damage = Math.floor(Math.random()*20)+10;
-  else if (type === "reciclar") damage = Math.floor(Math.random()*12)+5;
-  else if (type === "curar"){
+  if (type === "curar"){
     const heal = Math.floor(Math.random()*15)+8;
     playerHP = Math.min(100, playerHP + heal);
     playSound(healSound);
-    document.getElementById("battleText").textContent =
-      `🌱 Te curaste ${heal} puntos.`;
+    document.getElementById("battleText").textContent = `🌱 Te curaste ${heal} puntos.`;
     updateBars();
     // permitir que el enemigo actúe después de curar
     return setTimeout(()=> { canAct = true; enemyTurn(); }, 900);
   }
 
-  // animación
+  let damage = 0;
+  if (type === "eco") damage = Math.floor(Math.random()*20)+10;
+  else damage = Math.floor(Math.random()*12)+5; // reciclar
+
+  // animación jugador
   player.classList.add("attackAnim");
   playSound(hitSound);
   setTimeout(()=> player.classList.remove("attackAnim"), 300);
 
   enemyHP -= damage;
-  document.getElementById("battleText").textContent =
-    `💥 Le hiciste ${damage} de daño.`;
+  if (enemyHP < 0) enemyHP = 0;
 
+  document.getElementById("battleText").textContent = `💥 Le hiciste ${damage} de daño.`;
   updateBars();
 
-  if (enemyHP <= 0) return winBattle();
+  if (enemyHP <= 0) {
+    return setTimeout(()=> winBattle(), 350);
+  }
 
-  setTimeout(enemyTurn, 900);
+  setTimeout(()=> enemyTurn(), 900);
 }
 
 /* ===========================
@@ -505,18 +526,18 @@ function enemyTurn(){
   setTimeout(()=> enemy.classList.remove("enemyAttack"), 300);
 
   playerHP -= dmg;
-  document.getElementById("battleText").textContent =
-    `⚠ ${enemyName} te golpea por ${dmg}.`;
+  if (playerHP < 0) playerHP = 0;
 
+  document.getElementById("battleText").textContent = `⚠ ${enemyName} te golpea por ${dmg}.`;
   updateBars();
 
-  if (playerHP <= 0) return loseBattle();
+  if (playerHP <= 0) return setTimeout(()=> loseBattle(), 350);
 
   canAct = true;
 }
 
 /* ===========================
-   ACTUALIZAR BARRAS
+   ACTUALIZAR BARRAS (porcentaje)
    =========================== */
 function updateBars(){
   const enemyBar = document.getElementById("enemyHP");
@@ -524,14 +545,15 @@ function updateBars(){
 
   const L = levels[currentLevel];
   if (L && L.hp > 0) {
-    enemyBar.style.width =
-      Math.max(0, (enemyHP / L.hp) * 100) + "%";
+    // enemyHP es valor absoluto; lo convertimos a %
+    const pct = Math.max(0, (enemyHP / L.hp) * 100);
+    enemyBar.style.width = pct + "%";
   } else {
     enemyBar.style.width = "0%";
   }
 
-  playerBar.style.width =
-    Math.max(0, playerHP) + "%";
+  // playerHP está en 0-100 -> directo
+  playerBar.style.width = Math.max(0, playerHP) + "%";
 }
 
 /* ===========================
@@ -539,10 +561,8 @@ function updateBars(){
    =========================== */
 function winBattle(){
   const L = levels[currentLevel];
-
   playSound(winSound);
-  document.getElementById("battleText").textContent =
-    `🎉 ¡Has limpiado el estadio! ${L.message}`;
+  document.getElementById("battleText").textContent = `🎉 ¡Has limpiado el estadio! ${L.message}`;
 
   if (!clearedLevels.includes(currentLevel)) clearedLevels.push(currentLevel);
 
@@ -556,20 +576,19 @@ function winBattle(){
 
     gameEl.style.display = "block";
     document.getElementById("dialogue").textContent = `🌿 ${L.message}`;
-  },2000);
+  },1200);
 }
 
 /* ===========================
    PERDER BATALLA
    =========================== */
 function loseBattle(){
-  document.getElementById("battleText").textContent =
-    "💀 Fuiste derrotado. Inténtalo otra vez.";
+  document.getElementById("battleText").textContent = "💀 Fuiste derrotado. Inténtalo otra vez.";
 
   setTimeout(()=>{
-    // reiniciar el mismo nivel, pero sin cambiar clearedLevels
+    // reiniciar el mismo nivel (no elimina clearedLevels)
     startLevel(currentLevel);
-  },1500);
+  },900);
 }
 
 /* ===========================
@@ -580,14 +599,14 @@ function showCinematic(){
   battleEl.style.display = "none";
 
   try { bgMusic.pause(); } catch(e){}
-  finalMusic.play().catch(()=>{});
+  tryPlay(finalMusic);
 
   cinematicEl.style.display = "flex";
 
   setTimeout(()=>{
     cinematicEl.style.display = "none";
     endingEl.style.display = "block";
-  },15000);
+  },12000);
 }
 
 /* ===========================
@@ -602,17 +621,31 @@ document.getElementById("btnRestart")?.addEventListener("click", ()=>{
   menuEl.style.display = "flex";
 
   bgMusic.currentTime = 0;
-  bgMusic.play().catch(()=>{});
+  const musicToggle = document.getElementById("musicToggle");
+  if (musicToggle && musicToggle.checked) tryPlay(bgMusic);
 });
 
 /* ===========================
-   INICIO
+   INICIO (DOMContentLoaded)
    =========================== */
 document.addEventListener("DOMContentLoaded", ()=>{
   menuEl.style.display = "flex";
-  // Asegurar que las barras comiencen llenas
+  // Barras iniciales (100%)
   document.getElementById("enemyHP").style.width = "100%";
   document.getElementById("playerHP").style.width = "100%";
+
+  // Seguridad: si una imagen no carga, mostrar aviso en consola
+  const imgs = [
+    'imagenes/mapa_mundial_verde.png',
+    'imagenes/protagonista.png',
+    'imagenes/estadio_final.png',
+    'imagenes/nivel1.png','imagenes/nivel2.png','imagenes/nivel3.png','imagenes/nivel4.png','imagenes/nivel5.png'
+  ];
+  imgs.forEach(src => {
+    const img = new Image();
+    img.src = src;
+    img.onerror = ()=> console.warn("Imagen no encontrada:", src);
+  });
 });
 </script>
 </body>
