@@ -16,7 +16,7 @@
   *{box-sizing:border-box}
   body{
     margin:0;
-    font-family: "Press Start 2P", monospace;
+    font-family: "Press Start 2P", monospace, Arial, sans-serif;
     background: linear-gradient(var(--green-1), var(--green-2));
     color:#1b4332;
     overflow:hidden;
@@ -32,7 +32,7 @@
     align-items:center;
     background: linear-gradient(#b7e4c7, #95d5b2);
   }
-  h1 { margin:0 0 20px 0; font-size:22px; }
+  h1 { margin:0 0 20px 0; font-size:22px; text-align:center;}
   .btn{
     background:#2d6a4f;
     color:white;
@@ -56,6 +56,7 @@
     padding:18px;
     border-radius:10px;
     width:300px;
+    z-index:50;
   }
 
   /* ======= CONTENEDORES PRINCIPALES ======= */
@@ -72,8 +73,8 @@
   }
 
   #game{ background: url('imagenes/mapa_mundial_verde.png') center/cover no-repeat; }
-  
-.level{
+
+  .level{
     position:absolute;
     width:80px;
     height:80px;
@@ -83,8 +84,7 @@
     background-size:cover;
     background-position:center;
     transition:transform .2s;
-}
-
+  }
   .level:hover{ transform:scale(1.08); }
   .level.cleared{ box-shadow:0 0 15px #00ff73; filter:brightness(1.15); }
 
@@ -123,7 +123,7 @@
     background-position:center;
   }
   #enemy { top:100px; right:120px; }
-  #player { bottom:120px; left:100px; }
+  #player { bottom:120px; left:100px; background-image:url('imagenes/protagonista.png'); }
 
   #info{
     position:absolute;
@@ -203,7 +203,6 @@
   @media(max-width:900px){
     #game,#battle,#cinematic,#ending{ width:100%; height:70vh; margin:10px 0; }
   }
-
 </style>
 </head>
 <body>
@@ -249,7 +248,7 @@
   <h2 id="levelTitle" style="position:absolute; top:8px; left:12px; color:white; text-shadow:1px 1px #000;"></h2>
 
   <div id="enemy"></div>
-  <div id="player" style="background-image:url('imagenes/protagonista.png');"></div>
+  <div id="player"></div>
 
   <div id="info">
     <div style="color:white;"><b>👦 Tú</b> HP: <div class="hpBar"><div id="playerHP" class="hp"></div></div></div>
@@ -354,9 +353,9 @@ const endingEl = document.getElementById("ending");
    =========================== */
 function activarPantallaCompleta(){
   const elem = document.documentElement;
-  if (elem.requestFullscreen) elem.requestFullscreen();
-  if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
-  if (elem.msRequestFullscreen) elem.msRequestFullscreen();
+  if (elem.requestFullscreen) elem.requestFullscreen().catch(()=>{});
+  else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
+  else if (elem.msRequestFullscreen) elem.msRequestFullscreen();
 }
 
 /* ===========================
@@ -368,8 +367,8 @@ document.getElementById("btnStart").addEventListener("click", () => {
   menuEl.style.display = "none";
   gameEl.style.display = "block";
 
-  if (document.getElementById("musicToggle").checked)
-    bgMusic.play().catch(()=>{});
+  const musicToggle = document.getElementById("musicToggle");
+  if (musicToggle && musicToggle.checked) bgMusic.play().catch(()=>{});
 });
 
 /* ===========================
@@ -377,7 +376,7 @@ document.getElementById("btnStart").addEventListener("click", () => {
    =========================== */
 document.getElementById("btnExit").addEventListener("click", ()=>{
   alert("👋 Gracias por jugar Mundial Verde.");
-  window.close(); // solo funciona si la pestaña fue abierta por JS
+  try { window.close(); } catch(e){}
 });
 
 /* ===========================
@@ -394,20 +393,19 @@ document.getElementById("closeConfig").addEventListener("click", ()=>{
    SISTEMA DE PROGRESO:
    NO PUEDES ENTRAR A NIVELES BLOQUEADOS
    =========================== */
-
 document.querySelectorAll(".level").forEach(btn=>{
   btn.addEventListener("click", ()=>{
-    const lvl = parseInt(btn.dataset.level);
+    const lvl = parseInt(btn.dataset.level, 10);
 
     if (lvl > 1 && !clearedLevels.includes(lvl - 1)){
       document.getElementById("dialogue").textContent =
-        ⛔ Para entrar aquí debes limpiar primero el nivel ${lvl - 1}.;
+        `⛔ Para entrar aquí debes limpiar primero el nivel ${lvl - 1}.`;
       return;
     }
 
     if (clearedLevels.includes(lvl)){
       document.getElementById("dialogue").textContent =
-        ✔ Ya limpiaste ${levels[lvl].name}.;
+        `✔ Ya limpiaste ${levels[lvl].name}.`;
       return;
     }
 
@@ -427,10 +425,11 @@ function startLevel(lvl){
   enemyHP = L.hp;
   playerHP = 100;
 
-  document.getElementById("enemy").style.backgroundImage = url('${L.enemyImg}');
-  document.getElementById("battleStage").style.background = url('${L.bg}') center/cover no-repeat;
-  document.getElementById("levelTitle").textContent = ⚔ ${L.name};
-  document.getElementById("battleText").textContent = ${enemyName} aparece contaminando el estadio...;
+  // Establecer imágenes y textos usando template literals correctamente
+  document.getElementById("enemy").style.backgroundImage = `url('${L.enemyImg}')`;
+  document.getElementById("battleStage").style.background = `url('${L.bg}') center/cover no-repeat`;
+  document.getElementById("levelTitle").textContent = `⚔ ${L.name}`;
+  document.getElementById("battleText").textContent = `${enemyName} aparece contaminando el estadio...`;
 
   document.getElementById("enemyHP").style.width = "100%";
   document.getElementById("playerHP").style.width = "100%";
@@ -443,9 +442,12 @@ function startLevel(lvl){
    SONIDOS
    =========================== */
 function playSound(sound){
-  if (!document.getElementById("soundToggle").checked) return;
-  sound.currentTime = 0;
-  sound.play().catch(()=>{});
+  const soundToggle = document.getElementById("soundToggle");
+  if (soundToggle && !soundToggle.checked) return;
+  try {
+    sound.currentTime = 0;
+    sound.play().catch(()=>{});
+  } catch(e){}
 }
 
 /* ===========================
@@ -465,9 +467,10 @@ function attack(type){
     playerHP = Math.min(100, playerHP + heal);
     playSound(healSound);
     document.getElementById("battleText").textContent =
-      🌱 Te curaste ${heal} puntos.;
+      `🌱 Te curaste ${heal} puntos.`;
     updateBars();
-    return setTimeout(enemyTurn, 900);
+    // permitir que el enemigo actúe después de curar
+    return setTimeout(()=> { canAct = true; enemyTurn(); }, 900);
   }
 
   // animación
@@ -477,7 +480,7 @@ function attack(type){
 
   enemyHP -= damage;
   document.getElementById("battleText").textContent =
-    💥 Le hiciste ${damage} de daño.;
+    `💥 Le hiciste ${damage} de daño.`;
 
   updateBars();
 
@@ -503,7 +506,7 @@ function enemyTurn(){
 
   playerHP -= dmg;
   document.getElementById("battleText").textContent =
-    ⚠ ${enemyName} te golpea por ${dmg}.;
+    `⚠ ${enemyName} te golpea por ${dmg}.`;
 
   updateBars();
 
@@ -516,10 +519,18 @@ function enemyTurn(){
    ACTUALIZAR BARRAS
    =========================== */
 function updateBars(){
-  document.getElementById("enemyHP").style.width =
-    Math.max(0, enemyHP / levels[currentLevel].hp * 100) + "%";
+  const enemyBar = document.getElementById("enemyHP");
+  const playerBar = document.getElementById("playerHP");
 
-  document.getElementById("playerHP").style.width =
+  const L = levels[currentLevel];
+  if (L && L.hp > 0) {
+    enemyBar.style.width =
+      Math.max(0, (enemyHP / L.hp) * 100) + "%";
+  } else {
+    enemyBar.style.width = "0%";
+  }
+
+  playerBar.style.width =
     Math.max(0, playerHP) + "%";
 }
 
@@ -531,11 +542,11 @@ function winBattle(){
 
   playSound(winSound);
   document.getElementById("battleText").textContent =
-    🎉 ¡Has limpiado el estadio! ${L.message};
+    `🎉 ¡Has limpiado el estadio! ${L.message}`;
 
-  clearedLevels.push(currentLevel);
+  if (!clearedLevels.includes(currentLevel)) clearedLevels.push(currentLevel);
 
-  const dot = document.querySelector(.level[data-level='${currentLevel}']);
+  const dot = document.querySelector(`.level[data-level='${currentLevel}']`);
   if (dot) dot.classList.add("cleared");
 
   setTimeout(()=>{
@@ -544,7 +555,7 @@ function winBattle(){
     if (currentLevel === 5) return showCinematic();
 
     gameEl.style.display = "block";
-    document.getElementById("dialogue").textContent = 🌿 ${L.message};
+    document.getElementById("dialogue").textContent = `🌿 ${L.message}`;
   },2000);
 }
 
@@ -556,6 +567,7 @@ function loseBattle(){
     "💀 Fuiste derrotado. Inténtalo otra vez.";
 
   setTimeout(()=>{
+    // reiniciar el mismo nivel, pero sin cambiar clearedLevels
     startLevel(currentLevel);
   },1500);
 }
@@ -567,7 +579,7 @@ function showCinematic(){
   gameEl.style.display = "none";
   battleEl.style.display = "none";
 
-  bgMusic.pause();
+  try { bgMusic.pause(); } catch(e){}
   finalMusic.play().catch(()=>{});
 
   cinematicEl.style.display = "flex";
@@ -598,5 +610,10 @@ document.getElementById("btnRestart")?.addEventListener("click", ()=>{
    =========================== */
 document.addEventListener("DOMContentLoaded", ()=>{
   menuEl.style.display = "flex";
+  // Asegurar que las barras comiencen llenas
+  document.getElementById("enemyHP").style.width = "100%";
+  document.getElementById("playerHP").style.width = "100%";
 });
 </script>
+</body>
+</html>
